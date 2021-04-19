@@ -4,6 +4,7 @@ import torch.nn as nn
 from tqdm import tqdm
 import cv2
 from dnn.models.ALAE import StyleALAE
+from datasets import get_dataset, get_dataloader
 from utils.common_utils import find_latest_checkpoint
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -27,8 +28,10 @@ def inverse_normalize(tensor, mean, std):
     return tensor
 
 if __name__ == '__main__':
+    # dataset_name = "FFHQ"
+    # train_dataset, test_dataset = get_dataset("data", dataset_name, dim=config['resolutions'][-1])
     model = StyleALAE(model_config=config, device=device)
-    model.load_train_state('./Training_dir-test/StyleALAE-z-256_w-256_prog-(4,256)-(8,256)-(16,128)-(32,128)-(64,64)-(64,32)/checkpoints/ckpt_gs-120000_res-5=64x64_alpha-0.40.pt')
+    model.load_train_state('./archived/FFHQ/StyleALAE-z-256_w-256_prog-(4,256)-(8,256)-(16,128)-(32,128)-(64,64)-(64,32)/checkpoints/ckpt_gs-120000_res-5=64x64_alpha-0.40.pt')
 
     batch_size = 32
     batchs_in_phase = config['phase_lengths'][model.res_idx] // batch_size
@@ -37,14 +40,16 @@ if __name__ == '__main__':
     with torch.no_grad():
         generated_images = model.generate(test_samples_z,final_resolution_idx=model.res_idx, alpha=0)
         generated_images = generated_images * 0.5 + 0.5
-        generated_images = inverse_normalize(tensor=generated_images, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
+        # generated_images = inverse_normalize(tensor=generated_images, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
 
 
     for cvimg in generated_images.cpu().numpy():
         cvimg = cvimg.transpose(1,2,0)
         cvimg = cv2.cvtColor(cvimg, cv2.COLOR_RGB2BGR)
+        cvimg = cv2.resize( cvimg, dsize=(256,256) )
         cv2.imshow("Img", cvimg)
         cv2.waitKey(0)
 
+    cv2.destroyAllWindows()
     print("Finished")
 

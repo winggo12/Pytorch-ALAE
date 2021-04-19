@@ -198,6 +198,36 @@ def get_ffhq(data_dir, dim):
 
     return train_dataset, val_dataset
 
+def get_twdne(data_dir, dim):
+    imgs_dir = os.path.join(data_dir)
+    # if not os.path.exists(imgs_dir):
+    #     # download_ffhq_thumbnails(data_dir)
+    #     print("Please Download the dataset in here")
+
+    if dim <= 64:
+        pt_file = f"TWDNE_Thumbnail-{dim}x{dim}.pt"
+        if not os.path.exists(os.path.join(data_dir, pt_file)):
+            print(f"Preprocessing TWDNE: creating a {dim}x{dim}  version of all data")
+            imgs = []
+            img_loader = ImgLoader(center_crop_size=None, resize=dim, normalize=True, to_torch=True, dtype=torch.float32)
+            for img_name in tqdm(os.listdir(imgs_dir)):
+                fname = os.path.join(imgs_dir, img_name)
+                img = img_loader(fname)
+                imgs.append(img)
+            with open(os.path.join(data_dir, pt_file), 'wb') as f:
+                torch.save(torch.stack(imgs), f)
+
+        data = torch.load(os.path.join(data_dir, pt_file))
+        dataset = MemoryDataset(data)
+    else:
+        img_loader = ImgLoader(center_crop_size=None, resize=dim, normalize=True, to_torch=True, dtype=torch.float32)
+        img_paths = [os.path.join(imgs_dir, img_name) for img_name in os.listdir(imgs_dir)]
+        dataset = DiskDataset(img_paths, img_loader)
+    val_size = int(len(dataset) * VAL_SET_PORTION)
+    train_dataset, val_dataset = random_split(dataset, [len(dataset) - val_size, val_size])
+
+    return train_dataset, val_dataset
+
 class MemoryDataset(Dataset):
     def __init__(self, data_matrix):
         self.data_matrix = data_matrix
@@ -253,7 +283,8 @@ def get_dataset(data_root, dataset_name, dim):
         train_dataset, test_dataset = get_ffhq(os.path.join(data_root, 'FFHQ-thumbnails'), dim)
     elif dataset_name.lower() == 'lfw':
         train_dataset, test_dataset = get_lfw(os.path.join(data_root, 'LFW'), dim)
-
+    elif dataset_name.lower() == 'twdne':
+        train_dataset, test_dataset = get_twdne(os.path.join(data_root, 'Twdne-128'), dim)
     else:
         raise ValueError("No such available dataset")
 
