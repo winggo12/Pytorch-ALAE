@@ -249,6 +249,22 @@ def load_images(path):
         final_images[idx] = im
     return final_images
 
+def load_images_path(path):
+    image_paths = []
+    image_extensions = ["png", "jpg"]
+    for ext in image_extensions:
+        print("Looking for images in", os.path.join(path, "*.{}".format(ext)))
+        for impath in glob.glob(os.path.join(path, "*.{}".format(ext))):
+            image_paths.append(impath)
+    first_image = cv2.imread(image_paths[0])
+    W, H = first_image.shape[:2]
+    image_paths.sort()
+    image_paths = image_paths
+
+    return image_paths
+
+def preprocess_single_image():
+    
 
 if __name__ == "__main__":
     from optparse import OptionParser

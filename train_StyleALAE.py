@@ -9,7 +9,7 @@ from pprint import pprint
 parser = argparse.ArgumentParser(description='Train arguments')
 parser.add_argument("--output_root", type=str, default="Training_dir-test")
 parser.add_argument("--dataset_name", type=str, default="FFHQ", help='FFHQ/CelebA/LFW')
-parser.add_argument("--num_debug_images", type=int, default=32)
+parser.add_argument("--num_debug_images", type=int, default=16)
 parser.add_argument("--print_model", action='store_true', default=False)
 parser.add_argument("--print_config", action='store_true', default=False)
 parser.add_argument("--device", type=str, default="cuda:0", help="cuda:0/cpu")
