@@ -33,7 +33,7 @@ def inverse_normalize(tensor, mean, std):
 def generate_img(model, config, batch_size=32):
     test_samples_z = torch.randn(batch_size, config['z_dim'], dtype=torch.float32).to(device)
     with torch.no_grad():
-        generated_images = model.generate(test_samples_z,final_resolution_idx=model.res_idx, alpha=0)
+        generated_images = model.generate(test_samples_z,final_resolution_idx=model.res_idx, alpha=0.4)
         generated_images = generated_images * 0.5 + 0.5
         # generated_images = inverse_normalize(tensor=generated_images, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
 
@@ -91,8 +91,6 @@ def reconstruct_img(model, config, path, saved_path, show):
     print("Finished Reconstruction")
 
 if __name__ == '__main__':
-    # dataset_name = "FFHQ"
-    # train_dataset, test_dataset = get_dataset("data", dataset_name, dim=config['resolutions'][-1])
     path = "./data/FFHQ-thumbnails/thumbnails128x128"
     saved_path = "./data/FFHQ-thumbnails/reconstructed_thumbnails128x128"
     model = StyleALAE(model_config=config, device=device)
@@ -100,7 +98,6 @@ if __name__ == '__main__':
 
     batch_size = 32
     batchs_in_phase = config['phase_lengths'][model.res_idx] // batch_size
-    alpha = 64/(config['phase_lengths'][model.res_idx])
     # generate_img(model, config, batch_size)
     reconstruct_img(model, config, path, saved_path, False)
 

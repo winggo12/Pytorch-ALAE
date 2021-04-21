@@ -1,4 +1,5 @@
 import torch
+from utils.progress_bar import progress_bar
 from torch import nn
 from torchvision.models import inception_v3
 import cv2
@@ -8,6 +9,7 @@ import glob
 import os
 from scipy import linalg
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def to_cuda(elements):
     """
@@ -87,22 +89,36 @@ def get_activations(images, batch_size):
         inception_activations[start_idx:end_idx, :] = activations
     return inception_activations
 
+def get_inception_activations(imgs_path, batch_size):
+    print("Calculating Activation")
+    num_imgs = len(imgs_path)
+    inception_network = PartialInceptionNetwork()
+    inception_network = to_cuda(inception_network)
+    inception_network.eval()
+    n_batches = int(np.ceil(num_imgs / batch_size))
+    inception_activations = np.zeros((num_imgs, 2048), dtype=np.float32)
+    index = 0
+    while len(imgs_path) != 0:
+        imgs_path, new_batch_size, tensors = preprocess_imgs(imgs_path, batch_size)
+        activations = inception_network(tensors)
+        activations = activations.detach().cpu().numpy()
+        assert activations.shape == (tensors.shape[0], 2048), "Expexted output shape to be: {}, but was: {}".format(
+            (tensors.shape[0], 2048), activations.shape)
+        start_index = index*batch_size
+        end_index = start_index + new_batch_size
+        index += 1
+        inception_activations[start_index:end_index, :] = activations
+        current = num_imgs - len(imgs_path)
+        progress_bar(current, num_imgs, barLength = 20)
+    print("--Done--")
 
-def calculate_activation_statistics(images, batch_size):
-    """Calculates the statistics used by FID
-    Args:
-        images: torch.tensor, shape: (N, 3, H, W), dtype: torch.float32 in range 0 - 1
-        batch_size: batch size to use to calculate inception scores
-    Returns:
-        mu:     mean over all activations from the last pool layer of the inception model
-        sigma:  covariance matrix over all activations from the last pool layer
-                of the inception model.
-    """
-    act = get_activations(images, batch_size)
+    return inception_activations
+
+def calculate_activation_stat(activation):
+    act = activation
     mu = np.mean(act, axis=0)
     sigma = np.cov(act, rowvar=False)
     return mu, sigma
-
 
 # Modified from: https://github.com/bioinf-jku/TTUR/blob/master/fid.py
 def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
@@ -139,8 +155,8 @@ def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
     # product might be almost singular
     covmean, _ = linalg.sqrtm(sigma1.dot(sigma2), disp=False)
     if not np.isfinite(covmean).all():
-        msg = "fid calculation produces singular product; adding %s to diagonal of cov estimates" % eps
-        warnings.warn(msg)
+        # msg = "fid calculation produces singular product; adding %s to diagonal of cov estimates" % eps
+        # warnings.warn(msg)
         offset = np.eye(sigma1.shape[0]) * eps
         covmean = linalg.sqrtm((sigma1 + offset).dot(sigma2 + offset))
 
@@ -155,116 +171,49 @@ def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
 
     return diff.dot(diff) + np.trace(sigma1) + np.trace(sigma2) - 2 * tr_covmean
 
-
-def preprocess_image(im):
-    """Resizes and shifts the dynamic range of image to 0-1
-    Args:
-        im: np.array, shape: (H, W, 3), dtype: float32 between 0-1 or np.uint8
-    Return:
-        im: torch.tensor, shape: (3, 299, 299), dtype: torch.float32 between 0-1
-    """
-    assert im.shape[2] == 3
-    assert len(im.shape) == 3
-    if im.dtype == np.uint8:
-        im = im.astype(np.float32) / 255
-    im = cv2.resize(im, (299, 299))
-    im = np.rollaxis(im, axis=2)
-    im = torch.from_numpy(im)
-    assert im.max() <= 1.0
-    assert im.min() >= 0.0
-    assert im.dtype == torch.float32
-    assert im.shape == (3, 299, 299)
-
-    return im
-
-
-def preprocess_images(images, use_multiprocessing):
-    """Resizes and shifts the dynamic range of image to 0-1
-    Args:
-        images: np.array, shape: (N, H, W, 3), dtype: float32 between 0-1 or np.uint8
-        use_multiprocessing: If multiprocessing should be used to pre-process the images
-    Return:
-        final_images: torch.tensor, shape: (N, 3, 299, 299), dtype: torch.float32 between 0-1
-    """
-    if use_multiprocessing:
-        with multiprocessing.Pool(multiprocessing.cpu_count()) as pool:
-            jobs = []
-            for im in images:
-                job = pool.apply_async(preprocess_image, (im,))
-                jobs.append(job)
-            final_images = torch.zeros(images.shape[0], 3, 299, 299)
-            for idx, job in enumerate(jobs):
-                im = job.get()
-                final_images[idx] = im  # job.get()
-    else:
-        final_images = torch.stack([preprocess_image(im) for im in images], dim=0)
-    assert final_images.shape == (images.shape[0], 3, 299, 299)
-    assert final_images.max() <= 1.0
-    assert final_images.min() >= 0.0
-    assert final_images.dtype == torch.float32
-    return final_images
-
-
-def calculate_fid(images1, images2, use_multiprocessing, batch_size):
-    """ Calculate FID between images1 and images2
-    Args:
-        images1: np.array, shape: (N, H, W, 3), dtype: np.float32 between 0-1 or np.uint8
-        images2: np.array, shape: (N, H, W, 3), dtype: np.float32 between 0-1 or np.uint8
-        use_multiprocessing: If multiprocessing should be used to pre-process the images
-        batch size: batch size used for inception network
-    Returns:
-        FID (scalar)
-    """
-    images1 = preprocess_images(images1, use_multiprocessing)
-    images2 = preprocess_images(images2, use_multiprocessing)
-    mu1, sigma1 = calculate_activation_statistics(images1, batch_size)
-    mu2, sigma2 = calculate_activation_statistics(images2, batch_size)
-    fid = calculate_frechet_distance(mu1, sigma1, mu2, sigma2)
-    return fid
-
-
-def load_images(path):
-    """ Loads all .png or .jpg images from a given path
-    Warnings: Expects all images to be of same dtype and shape.
-    Args:
-        path: relative path to directory
-    Returns:
-        final_images: np.array of image dtype and shape.
-    """
-    image_paths = []
-    image_extensions = ["png", "jpg"]
-    for ext in image_extensions:
+def load_imgs_path(path):
+    imgs_path = []
+    imgs_type = ["png", "jpg"]
+    for ext in imgs_type:
         print("Looking for images in", os.path.join(path, "*.{}".format(ext)))
         for impath in glob.glob(os.path.join(path, "*.{}".format(ext))):
-            image_paths.append(impath)
-    first_image = cv2.imread(image_paths[0])
-    W, H = first_image.shape[:2]
-    image_paths.sort()
-    image_paths = image_paths
-    final_images = np.zeros((len(image_paths), H, W, 3), dtype=first_image.dtype)
-    for idx, impath in enumerate(image_paths):
-        im = cv2.imread(impath)
-        im = im[:, :, ::-1]  # Convert from BGR to RGB
-        assert im.dtype == final_images.dtype
-        final_images[idx] = im
-    return final_images
+            imgs_path.append(impath)
+    imgs_path.sort()
+    imgs_path = imgs_path
 
-def load_images_path(path):
-    image_paths = []
-    image_extensions = ["png", "jpg"]
-    for ext in image_extensions:
-        print("Looking for images in", os.path.join(path, "*.{}".format(ext)))
-        for impath in glob.glob(os.path.join(path, "*.{}".format(ext))):
-            image_paths.append(impath)
-    first_image = cv2.imread(image_paths[0])
-    W, H = first_image.shape[:2]
-    image_paths.sort()
-    image_paths = image_paths
+    return imgs_path
 
-    return image_paths
+def preprocess_single_img(img_path):
+    img = cv2.imread(img_path)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img = img / 255
+    img = cv2.resize(img, dsize=(299, 299))
+    img = img.transpose(2, 0, 1)
+    return img
 
-def preprocess_single_image():
-    
+def preprocess_imgs(imgs_path, batch_size):
+    """"Return Images Path then the Tensors of Images"""
+    assert len(imgs_path) != 0 , "Cannot Find Images in this Path"
+    imgs = []
+    if len(imgs_path) < batch_size:
+        batch_size = len(imgs_path)
+    for img_path in imgs_path[0:batch_size]:
+        img = preprocess_single_img(img_path)
+        imgs.append(img)
+    tensors = imgs_to_tensors(imgs)
+    del imgs_path[:batch_size]
+    return imgs_path, batch_size, tensors
+
+def imgs_to_tensors(imgs):
+    tensors = []
+    for img in imgs:
+        img_tensor = torch.tensor(img, dtype=torch.float32).to(device)
+        tensors.append(img_tensor)
+
+    tensors = torch.stack(tensors, dim=0)
+
+    return tensors
+
 
 if __name__ == "__main__":
     from optparse import OptionParser
@@ -286,8 +235,17 @@ if __name__ == "__main__":
     assert options.path1 is not None, "--path1 is an required option"
     assert options.path2 is not None, "--path2 is an required option"
     assert options.batch_size is not None, "--batch_size is an required option"
-    images1 = load_images(options.path1)
-    images2 = load_images(options.path2)
-    fid_value = calculate_fid(images1, images2, options.use_multiprocessing, options.batch_size)
-    print(fid_value)
+
+    img_path_1 = load_imgs_path(options.path1)
+    img_path_2 = load_imgs_path(options.path2)
+    inception_activations1 = get_inception_activations(img_path_1, options.batch_size)
+    inception_activations2 = get_inception_activations(img_path_2, options.batch_size)
+
+    mu1, sigma1 = calculate_activation_stat(inception_activations1)
+    mu2, sigma2 = calculate_activation_stat(inception_activations2)
+    fid = calculate_frechet_distance(mu1, sigma1, mu2, sigma2)
+    print("The FID of these datasets : ", fid)
+    print("Finished")
+
+
 
