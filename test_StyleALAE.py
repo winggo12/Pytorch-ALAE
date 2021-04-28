@@ -30,10 +30,17 @@ def inverse_normalize(tensor, mean, std):
         t.mul_(s).add_(m)
     return tensor
 
+def single_tensor_to_img(tensor):
+    cvimg = tensor.cpu().numpy()
+    cvimg = cvimg.transpose(1, 2, 0)
+    cvimg = cv2.cvtColor(cvimg, cv2.COLOR_RGB2BGR)
+    cvimg = cv2.resize(cvimg, dsize=(256, 256))
+    return cvimg
+
 def generate_img(model, config, batch_size=32):
     test_samples_z = torch.randn(batch_size, config['z_dim'], dtype=torch.float32).to(device)
     with torch.no_grad():
-        generated_images = model.generate(test_samples_z,final_resolution_idx=model.res_idx, alpha=0.4)
+        generated_images = model.generate(test_samples_z, final_resolution_idx=model.res_idx, alpha=0.4)
         generated_images = generated_images * 0.5 + 0.5
         # generated_images = inverse_normalize(tensor=generated_images, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
 
@@ -43,6 +50,52 @@ def generate_img(model, config, batch_size=32):
         cvimg = cv2.resize( cvimg, dsize=(256,256) )
         cv2.imshow("Img", cvimg)
         cv2.waitKey(0)
+
+    cv2.destroyAllWindows()
+    print("Finished")
+
+def generate_style_mixing_img(model, config):
+    z_main = torch.randn(1, config['z_dim'], dtype=torch.float32).to(device)
+    z_copy = torch.randn(1, config['z_dim'], dtype=torch.float32).to(device)
+    with torch.no_grad():
+        main_images = model.generate(z_main, final_resolution_idx=model.res_idx, alpha=0.4)
+        main_images = main_images * 0.5 + 0.5
+
+        copy_images = model.generate(z_copy, final_resolution_idx=model.res_idx, alpha=0.4)
+        copy_images = copy_images * 0.5 + 0.5
+
+        combined_images = model.generate_style_mixing(z_main, z_copy, copystylefrom=[4,8], final_resolution_idx=model.res_idx, alpha=0.4)
+        combined_images = combined_images * 0.5 + 0.5
+
+        main_image = single_tensor_to_img(main_images[0])
+        copy_image = single_tensor_to_img(copy_images[0])
+        combined_image = single_tensor_to_img(combined_images[0])
+
+        cv2.imshow("Main Image", main_image)
+        cv2.imshow("Copy Image", copy_image)
+        cv2.imshow("Combined Image", combined_image)
+        cv2.waitKey(0)
+
+    cv2.destroyAllWindows()
+    print("Finished")
+
+def generate_img_with_truncation(model, config):
+    batch_size = 1
+    test_samples_z = torch.randn(batch_size, config['z_dim'], dtype=torch.float32).to(device)
+    style = 3
+    while style >= 0.1:
+        with torch.no_grad():
+            generated_images = model.generate_with_truncation(test_samples_z, style=style, final_resolution_idx=model.res_idx, alpha=0.4)
+            generated_images = generated_images * 0.5 + 0.5
+            # generated_images = inverse_normalize(tensor=generated_images, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
+
+        for cvimg in generated_images.cpu().numpy():
+            cvimg = cvimg.transpose(1,2,0)
+            cvimg = cv2.cvtColor(cvimg, cv2.COLOR_RGB2BGR)
+            cvimg = cv2.resize( cvimg, dsize=(256,256) )
+            cv2.imshow("Img", cvimg)
+            cv2.waitKey(20)
+            style = style - 0.01
 
     cv2.destroyAllWindows()
     print("Finished")
@@ -69,7 +122,7 @@ def reconstruct_img(model, config, path, saved_path, show):
             img = img.transpose(2, 0, 1)
             img_tensor = torch.tensor(img, dtype=torch.float32).to(device).unsqueeze(0)
             # img_tensor = tran(img).to(device).unsqueeze(0)
-            restored_images = model.decode(model.encode(img_tensor, final_resolution_idx=model.res_idx, alpha=0.08),
+            restored_images = model.decode(model.encode(img_tensor, final_resolution_idx=model.res_idx, alpha=0.4),
                                           final_resolution_idx=model.res_idx, alpha=0.4)
             restored_images = restored_images * 0.5 + 0.5
             restored_image = restored_images[0].cpu().numpy().transpose(1,2,0)
@@ -95,10 +148,12 @@ if __name__ == '__main__':
     saved_path = "./data/FFHQ-thumbnails/reconstructed_thumbnails128x128"
     model = StyleALAE(model_config=config, device=device)
     model.load_train_state('./archived/FFHQ/StyleALAE-z-256_w-256_prog-(4,256)-(8,256)-(16,128)-(32,128)-(64,64)-(64,32)/checkpoints/ckpt_gs-120000_res-5=64x64_alpha-0.40.pt')
-
+    # model.load_train_state('./archived/FFHQ/StyleALAE-z-256_w-256_prog-(4,256)-(8,256)-(16,128)-(32,128)-(64,64)-(64,32)/checkpoints/ckpt_gs-120000_res-5=64x64_alpha-0.40.pt')
     batch_size = 32
-    batchs_in_phase = config['phase_lengths'][model.res_idx] // batch_size
+
     # generate_img(model, config, batch_size)
-    reconstruct_img(model, config, path, saved_path, False)
+    # generate_img_with_truncation(model, config)
+    # reconstruct_img(model, config, path, saved_path, False)
+    generate_style_mixing_img(model, config)
 
 

@@ -173,8 +173,23 @@ class StyleALAE(ALAE):
         self.G.eval()
         self.F.eval()
         generated_images = self.G(self.F(z_vectors), **ae_kwargs)
-        self.G.train()
-        self.F.train()
+        return torch.nn.functional.interpolate(generated_images, size=self.cfg['resolutions'][-1])
+
+    def generate_with_truncation(self, z_vectors, style = 1, **ae_kwargs):
+        self.G.eval()
+        self.F.eval()
+        w = self.F(z_vectors)
+        w_new = torch.mean(w) + style*(w - torch.mean(w))
+        generated_images = self.G(w_new, **ae_kwargs)
+        return torch.nn.functional.interpolate(generated_images, size=self.cfg['resolutions'][-1])
+
+    def generate_style_mixing(self, z_main, z_copy, copystylefrom,**ae_kwargs):
+        self.G.eval()
+        self.F.eval()
+        w_main = self.F(z_main)
+        w_copy = self.F(z_copy)
+        w = [w_main, w_copy]
+        generated_images = self.G(w, copystylefrom= copystylefrom, **ae_kwargs)
         return torch.nn.functional.interpolate(generated_images, size=self.cfg['resolutions'][-1])
 
     def encode(self, img, **ae_kwargs):

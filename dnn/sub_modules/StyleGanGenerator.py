@@ -45,7 +45,7 @@ class StyleGeneratorBlock(nn.Module):
     def __str__(self):
         return self. name
 
-    def forward(self, input, latent_w, noise):
+    def forward(self, input, latent_w, noise, noise_scaling_factor=None):
         if self.is_first_block:
             assert(input is None)
             result = self.const_input.repeat(latent_w.shape[0], 1, 1, 1)
@@ -55,12 +55,21 @@ class StyleGeneratorBlock(nn.Module):
             result = self.conv1(input)
             result = self.blur(result)
 
-        result += self.noise_scaler_1(noise)
+        if noise_scaling_factor is None:
+            result += self.noise_scaler_2(noise)
+        else:
+            result += (noise_scaling_factor * self.noise_scaler_2(noise))
+
+        # result += self.noise_scaler_1(noise)
         result = self.adain(result, self.style_affine_transform_1(latent_w))
         result = self.lrelu(result)
 
         result = self.conv2(result)
-        result += self.noise_scaler_2(noise)
+        if noise_scaling_factor is None:
+            result += self.noise_scaler_2(noise)
+        else:
+            result += (noise_scaling_factor * self.noise_scaler_2(noise))
+        # result += self.noise_scaler_2(noise)
         result = self.adain(result, self.style_affine_transform_2(latent_w))
         result = self.lrelu(result)
 
@@ -80,7 +89,7 @@ class StylleGanGenerator(nn.Module):
         assert progression[0][0] == STARTING_DIM, f"First module should note upscale so first out_dim should be {STARTING_DIM}"
         self.to_rgb = nn.ModuleList([])
         self.conv_blocks = nn.ModuleList([])
-
+        self.progression = progression
         # Parse the module description given in "progression"
         for i in range(len(progression)):
             self.to_rgb.append(Lreq_Conv2d(progression[i][1], 3, 1, 0))
@@ -102,15 +111,24 @@ class StylleGanGenerator(nn.Module):
             name += f"\t {self.conv_blocks[i]}\n"
         return name
 
-    def forward(self, w, final_resolution_idx, alpha):
+    def forward(self, w, final_resolution_idx, alpha, copystylefrom=None):
         generated_img = None
         feature_maps = None
         for i, block in enumerate(self.conv_blocks):
             # Separate noise for each block
-            noise = torch.randn((w.shape[0], 1, 1, 1), dtype=torch.float32).to(w.device)
-
-            prev_feature_maps = feature_maps
-            feature_maps = block(feature_maps, w, noise)
+            if type(w) != type([]) :
+                noise = torch.randn((w.shape[0], 1, 1, 1), dtype=torch.float32).to(w.device)
+                prev_feature_maps = feature_maps
+                feature_maps = block(feature_maps, w, noise, noise_scaling_factor=None)
+            else:
+                if self.progression[i][0] in copystylefrom:
+                    noise = torch.randn((w[1].shape[0], 1, 1, 1), dtype=torch.float32).to(w[1].device)
+                    prev_feature_maps = feature_maps
+                    feature_maps = block(feature_maps, w[1], noise, noise_scaling_factor=None)
+                else:
+                    noise = torch.randn((w[0].shape[0], 1, 1, 1), dtype=torch.float32).to(w[0].device)
+                    prev_feature_maps = feature_maps
+                    feature_maps = block(feature_maps, w[0], noise, noise_scaling_factor=None)
 
             if i == final_resolution_idx:
                 generated_img = self.to_rgb[i](feature_maps)
