@@ -69,6 +69,13 @@ class StyleGan:
             for group in optimizer.param_groups:
                 group['lr'] = new_lr
 
+    def generate(self, z_vectors, res_idx, alpha):
+        self.G.eval()
+        self.F.eval()
+        generated_images = self.G(self.F(z_vectors), res_idx, alpha)
+        generated_images = torch.nn.functional.interpolate(generated_images, size=self.cfg['resolutions'][-1])
+        return generated_images
+
     def train(self, train_dataset, test_data, output_dir):
         tracker = LossTracker(output_dir)
         global_steps = 0
@@ -100,6 +107,7 @@ class StyleGan:
                 if global_steps % self.cfg['dump_imgs_freq'] == 0:
                     self.save_sample(global_steps, tracker, test_data, output_dir, res_idx, alpha)
             self.save_train_state(os.path.join(output_dir, 'checkpoints', f"ckpt_res-{res_idx}={res}x{res}-end.pt"))
+
 
     def save_sample(self, gs, tracker, samples_z, output_dir, res_idx, alpha):
         with torch.no_grad():
