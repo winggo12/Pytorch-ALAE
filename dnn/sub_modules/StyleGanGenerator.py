@@ -111,7 +111,7 @@ class StylleGanGenerator(nn.Module):
             name += f"\t {self.conv_blocks[i]}\n"
         return name
 
-    def forward(self, w, final_resolution_idx, alpha, copystylefrom=None):
+    def forward(self, w, final_resolution_idx, alpha, copystyleto=None):
         generated_img = None
         feature_maps = None
         for i, block in enumerate(self.conv_blocks):
@@ -121,7 +121,7 @@ class StylleGanGenerator(nn.Module):
                 prev_feature_maps = feature_maps
                 feature_maps = block(feature_maps, w, noise, noise_scaling_factor=None)
             else:
-                if self.progression[i][0] in copystylefrom:
+                if self.progression[i][0] in copystyleto:
                     noise = torch.randn((w[1].shape[0], 1, 1, 1), dtype=torch.float32).to(w[1].device)
                     prev_feature_maps = feature_maps
                     feature_maps = block(feature_maps, w[1], noise, noise_scaling_factor=None)

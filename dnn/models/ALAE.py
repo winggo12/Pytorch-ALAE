@@ -183,13 +183,13 @@ class StyleALAE(ALAE):
         generated_images = self.G(w_new, **ae_kwargs)
         return torch.nn.functional.interpolate(generated_images, size=self.cfg['resolutions'][-1])
 
-    def generate_style_mixing(self, z_main, z_copy, copystylefrom,**ae_kwargs):
+    def generate_style_mixing(self, z_main, z_copy, copystyleto,**ae_kwargs):
         self.G.eval()
         self.F.eval()
         w_main = self.F(z_main)
         w_copy = self.F(z_copy)
         w = [w_main, w_copy]
-        generated_images = self.G(w, copystylefrom= copystylefrom, **ae_kwargs)
+        generated_images = self.G(w, copystyleto = copystyleto, **ae_kwargs)
         return torch.nn.functional.interpolate(generated_images, size=self.cfg['resolutions'][-1])
 
     def encode(self, img, **ae_kwargs):

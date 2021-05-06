@@ -39,6 +39,8 @@ def generate_img(model, config, saved_path, show, generation_size, alpha=0.4, ba
         os.makedirs(saved_path)
     cnt = 0
     for i in range(math.ceil(generation_size/batch_size)):
+        if i == math.ceil(generation_size/batch_size) - 1:
+            batch_size = generation_size - i*batch_size
         test_samples_z = torch.randn(batch_size, config['z_dim'], dtype=torch.float32).to(device)
         with torch.no_grad():
             generated_images = model.generate(test_samples_z, final_resolution_idx=model.res_idx, alpha=alpha)
@@ -59,7 +61,7 @@ def generate_img(model, config, saved_path, show, generation_size, alpha=0.4, ba
     cv2.destroyAllWindows()
     print("Finished")
 
-def generate_style_mixing_img(model, config, alpha=0.4):
+def generate_style_mixing_img(model, config, alpha=0.4, copystyleto=[4,8]):
     z_main = torch.randn(1, config['z_dim'], dtype=torch.float32).to(device)
     z_copy = torch.randn(1, config['z_dim'], dtype=torch.float32).to(device)
     with torch.no_grad():
@@ -69,7 +71,7 @@ def generate_style_mixing_img(model, config, alpha=0.4):
         copy_images = model.generate(z_copy, final_resolution_idx=model.res_idx, alpha=alpha)
         copy_images = copy_images * 0.5 + 0.5
 
-        combined_images = model.generate_style_mixing(z_main, z_copy, copystylefrom=[4,8], final_resolution_idx=model.res_idx, alpha=alpha)
+        combined_images = model.generate_style_mixing(z_main, z_copy, copystyleto=copystyleto, final_resolution_idx=model.res_idx, alpha=alpha)
         combined_images = combined_images * 0.5 + 0.5
 
         main_image = single_tensor_to_img(main_images[0], 128, 128)
@@ -157,12 +159,11 @@ if __name__ == '__main__':
     generation_saved_path = "./data/FFHQ-thumbnails/generated_thumbnails128x128"
     model = StyleALAE(model_config=config, device=device)
     model.load_train_state('./archived/FFHQ/StyleALAE-z-256_w-256_prog-(4,256)-(8,256)-(16,128)-(32,128)-(64,64)-(64,32)/checkpoints/ckpt_gs-120000_res-5=64x64_alpha-0.40.pt')
-    # model.load_train_state('./archived/FFHQ/StyleALAE-z-256_w-256_prog-(4,256)-(8,256)-(16,128)-(32,128)-(64,64)-(64,32)/checkpoints/ckpt_gs-120000_res-5=64x64_alpha-0.40.pt')
     batch_size = 32
 
-    # generate_img(model, config, generation_saved_path, True, 10)
-    generate_img_with_truncation(model, config)
+    generate_img(model, config, generation_saved_path, True, 3, alpha=0.4, batch_size=32)
     # reconstruct_img(model, config, path, reconstruction_saved_path, True, alpha=0.4)
-    # generate_style_mixing_img(model, config)
+    # generate_style_mixing_img(model, config, alpha=0.4, copystyleto=[4,8])
+    # generate_img_with_truncation(model, config, alpha=0.4)
 
 
