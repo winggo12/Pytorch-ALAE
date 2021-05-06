@@ -69,7 +69,9 @@ If you want to reconstruct / generate image , you can run the test_StyleALAE fil
 -Uncomment generate_img for generating image , at the current stage there is no saving function for generation (TODO)
 
 -This part will input a batch size of 1 tensor into our model , which will be slow --> Will be changed to selectable bs (TODO)
-	
+
+-Remember to set the alpha value to a correct value , this info should be available on the name of your pt file 
+
     if __name__ == '__main__':
 			path = "./data/FFHQ-thumbnails/thumbnails128x128"
 			saved_path = "./data/FFHQ-thumbnails/reconstructed_thumbnails128x128"

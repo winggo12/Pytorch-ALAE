@@ -87,8 +87,8 @@ def generate_style_mixing_img(model, config, alpha=0.4):
 def generate_img_with_truncation(model, config, alpha=0.4):
     batch_size = 1
     test_samples_z = torch.randn(batch_size, config['z_dim'], dtype=torch.float32).to(device)
-    style = 3
-    while style >= 0.1:
+    style = 0
+    while style < 1:
         with torch.no_grad():
             generated_images = model.generate_with_truncation(test_samples_z, style=style, final_resolution_idx=model.res_idx, alpha=alpha)
             generated_images = generated_images * 0.5 + 0.5
@@ -99,8 +99,11 @@ def generate_img_with_truncation(model, config, alpha=0.4):
             cvimg = cv2.cvtColor(cvimg, cv2.COLOR_RGB2BGR)
             cvimg = cv2.resize( cvimg, dsize=(256,256) )
             cv2.imshow("Img", cvimg)
-            cv2.waitKey(20)
-            style = style - 0.01
+            cv2.waitKey(30)
+            print(style)
+            style = style + 0.01
+            cvimg = cvimg * 255
+            cv2.imwrite("./Truncation/" + str(int(style*100)) + ".jpg", cvimg)
 
     cv2.destroyAllWindows()
     print("Finished")
@@ -157,9 +160,9 @@ if __name__ == '__main__':
     # model.load_train_state('./archived/FFHQ/StyleALAE-z-256_w-256_prog-(4,256)-(8,256)-(16,128)-(32,128)-(64,64)-(64,32)/checkpoints/ckpt_gs-120000_res-5=64x64_alpha-0.40.pt')
     batch_size = 32
 
-    generate_img(model, config, generation_saved_path, False, 70000)
-    # generate_img_with_truncation(model, config)
-    # reconstruct_img(model, config, path, reconstruction_saved_path, False)
+    # generate_img(model, config, generation_saved_path, True, 10)
+    generate_img_with_truncation(model, config)
+    # reconstruct_img(model, config, path, reconstruction_saved_path, True, alpha=0.4)
     # generate_style_mixing_img(model, config)
 
 
