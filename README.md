@@ -1,13 +1,33 @@
 ## Pytorch-ALAE
 
 ## Original Repos and Difference 
-Source: The ALAE part of this repo is copied from https://github.com/ariel415el/SimplePytorch-ALAE 
+Source: The ALAE and Gan part of this repo is orginiated from https://github.com/ariel415el/SimplePytorch-ALAE 
 
-Difference: Added New Dataset for Anime Character.
+Difference: 
 
-Source: The FID part of this repo is copied from https://github.com/hukkelas/pytorch-frechet-inception-distance/tree/c4bef90e502e7e1aec2a1a8f45b259630e093f8b
+-Added New Dataset for Anime Character.
 
-Difference: Original Repo will crash if loading a large database since it read all images at once and they are stored in the RAM, the new implementation will read the path to get the images during calculation of the fid
+-Added Saving Function for the Image Generated or Reconstructed by ALAE
+
+-Added Style Mixing and Image Truncation Trick by Modifying the forward function in ALAE
+
+-Added FID and PPL Metrics' Calculation
+
+Source: The FID part of this repo is originated from https://github.com/hukkelas/pytorch-frechet-inception-distance/tree/c4bef90e502e7e1aec2a1a8f45b259630e093f8b
+
+Difference: 
+
+-Original Repo will crash if loading a large database since it read all images at once and they are stored in the RAM
+
+-The new implementation will read the path to get the images during calculation of the fid
+
+Source: The PPL is originated from https://github.com/NVlabs/stylegan/blob/master/metrics/perceptual_path_length.py
+
+Difference:
+
+-Slerp Function is defined in a different way
+
+-The Handling of Latent Space W and Z has changed
 
 Please checkout their github and thank you for their contribution
 
@@ -33,8 +53,9 @@ The third row : Random Generated Image by Noise
 Remember to add argument when you run training: 
 
     python train_StyleALAE--dataset_name twdne
-##Evaluation Method 
-##1. FID
+    
+## Evaluation Method 
+## 1. FID (Frechet Inception Distance)
 If you do not have two dataset for comparison, you need to generate a reconstructed one or a random generated one to compare with the original dataset.
 Anyways, you can just use the test dataset in the repo. 
 
@@ -61,7 +82,7 @@ Result:
     The FID of these datasets :  133.45649989750808
     Finished
 
-##2. PPL in W and Z latent Space
+## 2. PPL in W and Z latent Space (Perceptual path length)
 Please download the vgg.pt file from Nvidia Website : 'https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada-pytorch/pretrained/metrics/vgg16.pt'
 or download it from Google Drive: https://drive.google.com/file/d/1EC1m_4Ae-54zYSfW8swKSyrmou-MSQtj/view?usp=sharing
 
@@ -119,20 +140,21 @@ Command:
 
 	python test_StyleALAE
 
-##1. Generate Image
+## 1. Generate Image
 
 Function:
 
     generate_img(model, config, saved_path, show, generation_size, alpha=0.4, batch_size=32)
 
 show - option for displaying the generated image
+
 generation size - represent how many images are going to be generated, 
 
 Result:
 
 ![text](assets/ImageGeneration.png) 
 
-##2. Reconstruct Image
+## 2. Reconstruct Image
 
 Function:
 
@@ -144,7 +166,7 @@ Result:
 
 ![text](assets/ImageReconstruction.png) 
 	
-##3. Image StyleMixing
+## 3. Image StyleMixing
 
 Function:
 
@@ -153,13 +175,14 @@ Function:
 Two latent code are used in style mixing , 
 -The main latent code cotributes to most input of generator
 -The latent code for copying contributes to part of the input, this can be control using the "copystyleto" option
+
 copystyleto - option for using the latent code for copying in different resolutions
 
 Result:
 
 ![text](assets/StyleMixingDiffRes.png) 
 
-##4. Image Truncation
+## 4. Image Truncation
 
 Function:
 
