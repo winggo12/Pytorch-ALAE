@@ -12,7 +12,6 @@ from datasets import get_dataset, get_dataloader
 from utils.common_utils import find_latest_checkpoint
 import glob
 
-
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 config = {
     'z_dim': 512,

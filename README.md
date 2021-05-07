@@ -90,8 +90,8 @@ Result:
     Process finished with exit code 0
 
 ## Inferencing the ALAE 
-## Reconstructing or Generate Images using ALAE
-If you want to reconstruct / generate image , you can run the test_StyleALAE file, but remember that you need to set up the pretrained model path:
+
+If you want to reconstruct / generate image or perform StyleMixing / Truncation , you can run the test_StyleALAE file, but remember that you need to set up the pretrained model path:
 
 -Select your model in the path
 
@@ -112,7 +112,7 @@ If you want to reconstruct / generate image , you can run the test_StyleALAE fil
     
     generate_img(model, config, generation_saved_path, True, 3, alpha=0.4, batch_size=32)
     # reconstruct_img(model, config, path, reconstruction_saved_path, True, alpha=0.4)
-    # generate_style_mixing_img(model, config, alpha=0.4, copystyleto=[4,8])
+    # generate_style_mixing_img(model, config, alpha=0.4, copystyleto=[[4,8],[8,16],[16,32],[32,64]])
     # generate_img_with_truncation(model, config, alpha=0.4)
 
 Command: 
@@ -157,7 +157,7 @@ copystyleto - option for using the latent code for copying in different resoluti
 
 Result:
 
-![text](assets/StyleMixing.png) 
+![text](assets/StyleMixingDiffRes.png) 
 
 ##4. Image Truncation
 
@@ -166,5 +166,5 @@ Function:
     generate_img_with_truncation(model, config, alpha=0.4)
 
 Result
-
+![text](assets/ImageTruncationTrick.png)   
 ![text](assets/truncation.gif)

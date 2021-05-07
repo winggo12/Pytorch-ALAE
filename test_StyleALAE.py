@@ -64,23 +64,53 @@ def generate_img(model, config, saved_path, show, generation_size, alpha=0.4, ba
 def generate_style_mixing_img(model, config, alpha=0.4, copystyleto=[4,8]):
     z_main = torch.randn(1, config['z_dim'], dtype=torch.float32).to(device)
     z_copy = torch.randn(1, config['z_dim'], dtype=torch.float32).to(device)
-    with torch.no_grad():
-        main_images = model.generate(z_main, final_resolution_idx=model.res_idx, alpha=alpha)
-        main_images = main_images * 0.5 + 0.5
+    if type(copystyleto) != type([[]]):
+        with torch.no_grad():
+            main_images = model.generate(z_main, final_resolution_idx=model.res_idx, alpha=alpha)
+            main_images = main_images * 0.5 + 0.5
 
-        copy_images = model.generate(z_copy, final_resolution_idx=model.res_idx, alpha=alpha)
-        copy_images = copy_images * 0.5 + 0.5
+            copy_images = model.generate(z_copy, final_resolution_idx=model.res_idx, alpha=alpha)
+            copy_images = copy_images * 0.5 + 0.5
 
-        combined_images = model.generate_style_mixing(z_main, z_copy, copystyleto=copystyleto, final_resolution_idx=model.res_idx, alpha=alpha)
-        combined_images = combined_images * 0.5 + 0.5
+            combined_images = model.generate_style_mixing(z_main, z_copy, copystyleto=copystyleto, final_resolution_idx=model.res_idx, alpha=alpha)
+            combined_images = combined_images * 0.5 + 0.5
 
-        main_image = single_tensor_to_img(main_images[0], 128, 128)
-        copy_image = single_tensor_to_img(copy_images[0], 128, 128)
-        combined_image = single_tensor_to_img(combined_images[0], 128, 128)
+            main_image = single_tensor_to_img(main_images[0], 128, 128)
+            copy_image = single_tensor_to_img(copy_images[0], 128, 128)
+            combined_image = single_tensor_to_img(combined_images[0], 128, 128)
 
-        cv2.imshow("Main Image", main_image)
-        cv2.imshow("Copy Image", copy_image)
-        cv2.imshow("Combined Image", combined_image)
+            cv2.imshow("Main Image", main_image)
+            cv2.imshow("Copy Image", copy_image)
+            cv2.imshow("Combined Image", combined_image)
+            cv2.waitKey(0)
+        cv2.destroyAllWindows()
+    else:
+        im_v = []
+        for resolution in copystyleto:
+            with torch.no_grad():
+                main_images = model.generate(z_main, final_resolution_idx=model.res_idx, alpha=alpha)
+                main_images = main_images * 0.5 + 0.5
+
+                copy_images = model.generate(z_copy, final_resolution_idx=model.res_idx, alpha=alpha)
+                copy_images = copy_images * 0.5 + 0.5
+
+                combined_images = model.generate_style_mixing(z_main, z_copy, copystyleto=resolution,
+                                                              final_resolution_idx=model.res_idx, alpha=alpha)
+                combined_images = combined_images * 0.5 + 0.5
+
+                main_image = single_tensor_to_img(main_images[0], 128, 128)
+                copy_image = single_tensor_to_img(copy_images[0], 128, 128)
+                combined_image = single_tensor_to_img(combined_images[0], 128, 128)
+
+                # cv2.imshow("Main Image", main_image)
+                # cv2.imshow("Copy Image", copy_image)
+                # cv2.imshow("Combined Image@resolution "+str(resolution), combined_image)
+                im_h = cv2.hconcat([main_image, copy_image, combined_image])
+                pos = (int(im_h.shape[0]*0.1), int(im_h.shape[1]*0.1))
+                cv2.putText(im_h,"Res:" + str(resolution), pos, cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0),2)
+                im_v.append(im_h)
+        im_v = cv2.vconcat(im_v)
+        cv2.imshow("Main , Copy, Combined ", im_v)
         cv2.waitKey(0)
 
     cv2.destroyAllWindows()
@@ -161,9 +191,9 @@ if __name__ == '__main__':
     model.load_train_state('./archived/FFHQ/StyleALAE-z-256_w-256_prog-(4,256)-(8,256)-(16,128)-(32,128)-(64,64)-(64,32)/checkpoints/ckpt_gs-120000_res-5=64x64_alpha-0.40.pt')
     batch_size = 32
 
-    generate_img(model, config, generation_saved_path, True, 3, alpha=0.4, batch_size=32)
+    # generate_img(model, config, generation_saved_path, True, 3, alpha=0.4, batch_size=32)
     # reconstruct_img(model, config, path, reconstruction_saved_path, True, alpha=0.4)
-    # generate_style_mixing_img(model, config, alpha=0.4, copystyleto=[4,8])
-    # generate_img_with_truncation(model, config, alpha=0.4)
+    # generate_style_mixing_img(model, config, alpha=0.4, copystyleto=[[4,8],[8,16],[16,32],[32,64]])
+    generate_img_with_truncation(model, config, alpha=0.4)
 
 
